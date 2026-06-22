@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>8프레임 자연스러운 보행 테스트</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body, main { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { font-family: Inter, Pretendard, system-ui, sans-serif; background: #f5f3ef; color: #292824; }
+    .panel {
+      position: fixed; left: 24px; top: 24px; z-index: 5; display: flex; align-items: center; gap: 14px;
+      padding: 12px 14px; border: 1px solid rgba(28,27,24,.1); border-radius: 13px;
+      background: rgba(255,255,255,.84); box-shadow: 0 8px 28px rgba(35,31,24,.08); backdrop-filter: blur(12px);
+    }
+    .panel div { display: grid; gap: 2px; }
+    .panel strong { font-size: 14px; }
+    .panel span { font-size: 11px; color: #77736a; }
+    button { border: 0; border-radius: 8px; padding: 8px 11px; background: #292824; color: white; cursor: pointer; }
+    #walker { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; will-change: transform; }
+    #frame {
+      position: absolute; left: 0; bottom: 0; overflow: hidden;
+      width: 58px; height: 142px; transform: translateX(-50%);
+    }
+    #sheet { position: absolute; top: 0; height: 142px; max-width: none; will-change: transform; }
+    #shadow {
+      position: absolute; left: 0; top: 0; width: 42px; height: 11px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(31,28,24,.17), rgba(31,28,24,0) 72%);
+      will-change: transform;
+    }
+    #note { position: fixed; right: 22px; bottom: 18px; font-size: 11px; color: #918d84; }
+  </style>
+</head>
+<body>
+  <main aria-label="8프레임 SVG 걷기 테스트">
+    <section class="panel">
+      <div><strong>8프레임 보행 테스트</strong><span>프레임과 이동 거리 동기화</span></div>
+      <button id="toggle" type="button">일시정지</button>
+    </section>
+    <div id="shadow"></div>
+    <div id="walker"><div id="frame"><img id="sheet" src="./person_1.svg" alt="" /></div></div>
+    <div id="note">한 방향 테스트 · SVG 원본 사용</div>
+  </main>
+  <script src="person1-test.js"></script>
+</body>
+</html>
