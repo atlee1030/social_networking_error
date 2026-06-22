@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>사람들의 흐름 — 1단계</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <canvas id="scene" aria-label="사람들이 자연스럽게 돌아다니는 시뮬레이션"></canvas>
+    <section class="panel">
+      <div>
+        <strong>사람들의 흐름</strong>
+        <span>1단계 · X–Z 바닥 / Y 높이</span>
+        <span id="mic-status">마이크 꺼짐</span>
+      </div>
+      <label>사람 수 <input id="population" type="range" min="10" max="120" value="55" /></label>
+      <button id="microphone" type="button">마이크 켜기</button>
+      <button id="toggle" type="button">일시정지</button>
+    </section>
+  </main>
+  <script src="main.js"></script>
+</body>
+</html>

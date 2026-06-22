@@ -1,0 +1,21 @@
+:root { color-scheme: light; font-family: Inter, Pretendard, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body, main { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { background: #eeeae2; }
+canvas { display: block; width: 100%; height: 100%; }
+.panel {
+  position: fixed; left: 24px; top: 24px; display: flex; align-items: center; gap: 22px;
+  padding: 13px 15px; border: 1px solid rgba(28, 27, 24, .12); border-radius: 14px;
+  background: rgba(255,255,255,.78); box-shadow: 0 8px 30px rgba(32,28,20,.08); backdrop-filter: blur(14px);
+  color: #282722; font-size: 12px;
+}
+.panel div { display: grid; gap: 2px; }
+.panel strong { font-size: 14px; }
+.panel span { color: #77736a; }
+.panel label { display: flex; align-items: center; gap: 8px; color: #5e5b54; }
+.panel input { width: 90px; accent-color: #c75248; }
+.panel button { border: 0; border-radius: 8px; padding: 8px 11px; background: #292824; color: white; cursor: pointer; }
+.panel button.active { background: #b9473f; }
+#mic-status { font-size: 10px; color: #969187; }
+#mic-status.listening { color: #b9473f; }
+@media (max-width: 640px) { .panel { right: 16px; left: 16px; top: 16px; gap: 10px; justify-content: space-between; } .panel label { display: none; } }
