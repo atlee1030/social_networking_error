@@ -1,9 +1,6 @@
 const canvas = document.querySelector('#scene');
 const ctx = canvas.getContext('2d');
-const population = document.querySelector('#population');
-const toggle = document.querySelector('#toggle');
 const microphoneButton = document.querySelector('#microphone');
-const microphoneStatus = document.querySelector('#mic-status');
 
 let width = 0;
 let height = 0;
@@ -23,7 +20,6 @@ let audioSamples = null;
 let smoothedLevel = 0;
 let noiseFloor = 0.012;
 let lastGlitchPulse = 0;
-let lastMicLabelUpdate = 0;
 
 // 공간 좌표: 사람은 X–Z 바닥(y=0) 위에서만 움직인다.
 const WORLD = { minX: -86, maxX: 86, minZ: -58, maxZ: 58 };
@@ -133,6 +129,36 @@ function project(x, y, z) {
   };
 }
 
+function screenLaneGeometry() {
+  const basis = cameraBasis();
+  const laneX = -basis.right.z;
+  const laneZ = basis.right.x;
+  const screenHere = project(0, 0, 0);
+  const laneProbe = project(laneX, 0, laneZ);
+  const downSign = laneProbe.y >= screenHere.y ? 1 : -1;
+  return { basis, laneX, laneZ, downSign };
+}
+
+let respawnLaneIndex = Math.floor(Math.random() * 5);
+
+function randomInitialScreenLane() {
+  return random(-58, 58);
+}
+
+function nextRespawnScreenLane() {
+  // 재등장은 위·중간·아래의 다섯 구역을 순환해 한쪽에 연속으로 몰리지 않게 한다.
+  const bands = [
+    [-58, -36],
+    [-34, -12],
+    [-10, 10],
+    [12, 34],
+    [36, 58],
+  ];
+  const band = bands[respawnLaneIndex % bands.length];
+  respawnLaneIndex += 1;
+  return random(band[0], band[1]);
+}
+
 function resize() {
   pixelRatio = Math.min(devicePixelRatio || 1, 2);
   width = innerWidth;
@@ -145,14 +171,17 @@ function resize() {
 
 class Person {
   constructor() {
-    this.x = random(WORLD.minX + 4, WORLD.maxX - 4);
     this.y = 0;
-    this.z = random(WORLD.minZ + 4, WORLD.maxZ - 4);
     this.speed = random(5.2, 8.2);
     // 0: 우상→좌하, 1: 좌상→우하, 2: 우하→좌상, 3: 좌하→우상
     this.flowType = Math.floor(Math.random() * 4);
     this.horizontalDirection = this.flowType === 1 || this.flowType === 3 ? 1 : -1;
     this.verticalDirection = this.flowType >= 2 ? -1 : 1;
+    const { basis, laneX, laneZ, downSign } = screenLaneGeometry();
+    const travel = random(-92, 92);
+    const lanePosition = randomInitialScreenLane() * downSign;
+    this.x = basis.right.x * travel + laneX * lanePosition;
+    this.z = basis.right.z * travel + laneZ * lanePosition;
     const angle = random(0, Math.PI * 2);
     this.vx = Math.cos(angle) * this.speed;
     this.vz = Math.sin(angle) * this.speed;
@@ -175,15 +204,12 @@ class Person {
 
   update(dt) {
     if (LIMITED_DIRECTION_TEST) {
-      const basis = cameraBasis();
-      const laneX = -basis.right.z;
-      const laneZ = basis.right.x;
+      const { basis, laneX, laneZ, downSign } = screenLaneGeometry();
 
       // 화면 투영 결과가 실제로 아래쪽 15도가 되도록 바닥 방향을 보정한다.
       const screenHere = project(this.x, 0, this.z);
       const screenRight = project(this.x + basis.right.x, 0, this.z + basis.right.z);
       const laneProbe = project(this.x + laneX, 0, this.z + laneZ);
-      const downSign = laneProbe.y >= screenHere.y ? 1 : -1;
       const horizontalPixels = Math.abs(screenRight.x - screenHere.x) || 1;
       const verticalPixels = Math.abs(laneProbe.y - screenHere.y) || 1;
       const laneWeight = Math.tan(15 * Math.PI / 180) * horizontalPixels / verticalPixels;
@@ -231,7 +257,11 @@ class Person {
       const passedVertical = this.verticalDirection > 0
         ? lanePosition * downSign > 60
         : lanePosition * downSign < -60;
-      if (passedSide) travel = this.horizontalDirection < 0 ? 96 : -96;
+      if (passedSide) {
+        travel = this.horizontalDirection < 0 ? 96 : -96;
+        // 이후 재등장은 화면 높이의 여러 구역에 차례로 나눈다.
+        lanePosition = nextRespawnScreenLane() * downSign;
+      }
       if (passedVertical) lanePosition = -downSign * this.verticalDirection * 60;
 
       if (passedSide || passedVertical) {
@@ -511,11 +541,6 @@ function updateMicrophone(now) {
     lastGlitchPulse = now;
   }
 
-  if (now - lastMicLabelUpdate > 120) {
-    const percent = Math.round(clamp(smoothedLevel / 0.18, 0, 1) * 100);
-    microphoneStatus.textContent = `듣는 중 · 음량 ${percent}%`;
-    lastMicLabelUpdate = now;
-  }
 }
 
 async function stopMicrophone() {
@@ -527,14 +552,12 @@ async function stopMicrophone() {
   audioSamples = null;
   microphoneActive = false;
   microphoneButton.classList.remove('active');
-  microphoneButton.textContent = '마이크 켜기';
-  microphoneStatus.classList.remove('listening');
-  microphoneStatus.textContent = '마이크 꺼짐';
+  microphoneButton.textContent = 'MIC OFF';
+  microphoneButton.setAttribute('aria-pressed', 'false');
 }
 
 async function startMicrophone() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    microphoneStatus.textContent = 'localhost 또는 HTTPS 필요';
     return;
   }
   try {
@@ -550,11 +573,12 @@ async function startMicrophone() {
     audioSamples = new Float32Array(analyser.fftSize);
     microphoneActive = true;
     microphoneButton.classList.add('active');
-    microphoneButton.textContent = '마이크 끄기';
-    microphoneStatus.classList.add('listening');
-    microphoneStatus.textContent = '듣는 중 · 말해보세요';
+    microphoneButton.textContent = 'MIC ON';
+    microphoneButton.setAttribute('aria-pressed', 'true');
   } catch (error) {
-    microphoneStatus.textContent = error.name === 'NotAllowedError' ? '마이크 권한이 필요함' : '마이크 연결 실패';
+    microphoneButton.classList.remove('active');
+    microphoneButton.textContent = 'MIC OFF';
+    microphoneButton.setAttribute('aria-pressed', 'false');
   }
 }
 
@@ -574,16 +598,11 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-population.addEventListener('input', () => setPopulation(Number(population.value)));
-toggle.addEventListener('click', () => {
-  running = !running;
-  toggle.textContent = running ? '일시정지' : '계속하기';
-});
 microphoneButton.addEventListener('click', () => {
   if (microphoneActive) stopMicrophone();
   else startMicrophone();
 });
 addEventListener('resize', resize);
 resize();
-setPopulation(Number(population.value));
+setPopulation(55);
 requestAnimationFrame(frame);
