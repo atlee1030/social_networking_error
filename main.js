@@ -1,6 +1,5 @@
 const canvas = document.querySelector('#scene');
 const ctx = canvas.getContext('2d');
-const microphoneButton = document.querySelector('#microphone');
 
 let width = 0;
 let height = 0;
@@ -33,6 +32,7 @@ const CAMERA = {
 const palette = ['#276078', '#c65347', '#d69b45', '#45513f', '#7a5269', '#343a40'];
 const random = (min, max) => min + Math.random() * (max - min);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const CHARACTER_DRAW_SCALE = 1.68;
 
 // person_1.svg 안의 8개 완성 자세를 메인 군중의 걷기 프레임으로 사용한다.
 const rightToLeftSheet = new Image();
@@ -394,7 +394,7 @@ class Person {
       const frameIndex = activeSequence[((sequenceIndex % activeSequence.length) + activeSequence.length) % activeSequence.length];
       const pose = activePoses[frameIndex];
       const bob = Math.abs(Math.sin(this.stride)) * bodyHeight * 0.025 * moving;
-      const spriteHeight = bodyHeight * 1.14;
+      const spriteHeight = bodyHeight * CHARACTER_DRAW_SCALE;
       const spriteWidth = spriteHeight * (pose.width / activeSourceHeight);
       const anchor = pose.anchor ?? 0.5;
       const sourceBottom = pose.bottom ?? activeSourceHeight;
@@ -508,7 +508,7 @@ function triggerRandomGlitches(level, now) {
   const availableSlots = Math.max(0, maxActive - activeCount);
   if (!availableSlots) return;
 
-  const intensity = clamp((level - 0.03) / 0.17, 0, 1);
+  const intensity = clamp((level - 0.018) / 0.13, 0, 1);
   const wanted = Math.max(1, Math.round(people.length * (0.04 + intensity * 0.11)));
   const eligible = people.filter(person => person.glitchUntil <= now && person.glitchCooldownUntil <= now);
 
@@ -532,28 +532,15 @@ function updateMicrophone(now) {
   let sum = 0;
   for (const sample of audioSamples) sum += sample * sample;
   const rms = Math.sqrt(sum / audioSamples.length);
-  smoothedLevel = smoothedLevel * 0.76 + rms * 0.24;
-  if (smoothedLevel < noiseFloor * 1.8) noiseFloor = noiseFloor * 0.992 + smoothedLevel * 0.008;
-  const threshold = Math.max(0.028, noiseFloor * 2.6);
+  smoothedLevel = smoothedLevel * 0.68 + rms * 0.32;
+  if (smoothedLevel < noiseFloor * 1.65) noiseFloor = noiseFloor * 0.99 + smoothedLevel * 0.01;
+  const threshold = Math.max(0.016, noiseFloor * 1.85);
 
-  if (smoothedLevel > threshold && now - lastGlitchPulse > 240) {
+  if (smoothedLevel > threshold && now - lastGlitchPulse > 150) {
     triggerRandomGlitches(smoothedLevel, now);
     lastGlitchPulse = now;
   }
 
-}
-
-async function stopMicrophone() {
-  microphoneStream?.getTracks().forEach(track => track.stop());
-  if (audioContext && audioContext.state !== 'closed') await audioContext.close();
-  microphoneStream = null;
-  audioContext = null;
-  analyser = null;
-  audioSamples = null;
-  microphoneActive = false;
-  microphoneButton.classList.remove('active');
-  microphoneButton.textContent = 'MIC OFF';
-  microphoneButton.setAttribute('aria-pressed', 'false');
 }
 
 async function startMicrophone() {
@@ -564,7 +551,9 @@ async function startMicrophone() {
     microphoneStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
-    audioContext = new AudioContext();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    audioContext = new AudioContextClass();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 1024;
     analyser.smoothingTimeConstant = 0.35;
@@ -572,13 +561,8 @@ async function startMicrophone() {
     source.connect(analyser);
     audioSamples = new Float32Array(analyser.fftSize);
     microphoneActive = true;
-    microphoneButton.classList.add('active');
-    microphoneButton.textContent = 'MIC ON';
-    microphoneButton.setAttribute('aria-pressed', 'true');
   } catch (error) {
-    microphoneButton.classList.remove('active');
-    microphoneButton.textContent = 'MIC OFF';
-    microphoneButton.setAttribute('aria-pressed', 'false');
+    microphoneActive = false;
   }
 }
 
@@ -598,11 +582,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-microphoneButton.addEventListener('click', () => {
-  if (microphoneActive) stopMicrophone();
-  else startMicrophone();
-});
 addEventListener('resize', resize);
 resize();
 setPopulation(55);
+startMicrophone();
 requestAnimationFrame(frame);
